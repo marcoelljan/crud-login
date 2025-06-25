@@ -1,47 +1,67 @@
 import React, { useState, useEffect } from "react";
 
 function Crud() {
-  const [items, setItems] = useState(() => {
-    // Load from localStorage on first render
-    const saved = localStorage.getItem("crud-items");
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [items, setItems] = useState([]);
   const [input, setInput] = useState("");
-  const [editIndex, setEditIndex] = useState(null);
+  const [editId, setEditId] = useState(null);
 
-  // Save to localStorage whenever items change
+  // Fetch items from backend
   useEffect(() => {
-    localStorage.setItem("crud-items", JSON.stringify(items));
-  }, [items]);
+    fetch("http://localhost:4000/api/items")
+      .then(res => res.json())
+      .then(data => setItems(data))
+      .catch(() => setItems([]));
+  }, []);
 
   // Create
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (input.trim() === "") return;
-    setItems([...items, input]);
-    setInput("");
+    const res = await fetch("http://localhost:4000/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value: input }),
+    });
+    if (res.ok) {
+      // Refetch items
+      fetch("http://localhost:4000/api/items")
+        .then(res => res.json())
+        .then(data => setItems(data));
+      setInput("");
+    }
+  };
+
+  // Edit (prepare to update)
+  const handleEdit = (item) => {
+    setInput(item.value);
+    setEditId(item.id);
   };
 
   // Update
-  const handleEdit = (index) => {
-    setInput(items[index]);
-    setEditIndex(index);
-  };
-
-  const handleUpdate = () => {
-    if (input.trim() === "") return;
-    const updated = [...items];
-    updated[editIndex] = input;
-    setItems(updated);
-    setInput("");
-    setEditIndex(null);
+  const handleUpdate = async () => {
+    if (input.trim() === "" || editId === null) return;
+    const res = await fetch(`http://localhost:4000/api/items/${editId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value: input }),
+    });
+    if (res.ok) {
+      fetch("http://localhost:4000/api/items")
+        .then(res => res.json())
+        .then(data => setItems(data));
+      setInput("");
+      setEditId(null);
+    }
   };
 
   // Delete
-  const handleDelete = (index) => {
-    setItems(items.filter((_, i) => i !== index));
+  const handleDelete = async (id) => {
+    await fetch(`http://localhost:4000/api/items/${id}`, { method: "DELETE" });
+    fetch("http://localhost:4000/api/items")
+      .then(res => res.json())
+      .then(data => setItems(data));
   };
 
-  // Read (render)
+  // Render
   return (
     <div
       style={{
@@ -66,7 +86,7 @@ function Crud() {
           maxWidth: "90vw",
         }}
       >
-        <h2 style={{ textAlign: "center", fontSize: "2rem", marginBottom: 24 }}>CRUD Operations </h2>
+        <h2 style={{ textAlign: "center", fontSize: "2rem", marginBottom: 24 }}>CRUD Operations</h2>
         <div style={{ display: "flex", marginBottom: 20 }}>
           <input
             value={input}
@@ -81,7 +101,7 @@ function Crud() {
               marginRight: 10,
             }}
           />
-          {editIndex === null ? (
+          {editId === null ? (
             <button
               onClick={handleAdd}
               style={{
@@ -114,9 +134,9 @@ function Crud() {
           )}
         </div>
         <ul style={{ listStyle: "none", padding: 0 }}>
-          {items.map((item, idx) => (
+          {items.map((item) => (
             <li
-              key={idx}
+              key={item.id}
               style={{
                 margin: "12px 0",
                 fontSize: "1.2rem",
@@ -127,10 +147,10 @@ function Crud() {
                 paddingBottom: 6,
               }}
             >
-              <span>{item}</span>
+              <span>{item.value}</span>
               <span>
                 <button
-                  onClick={() => handleEdit(idx)}
+                  onClick={() => handleEdit(item)}
                   style={{
                     marginLeft: 8,
                     fontSize: "1rem",
@@ -145,7 +165,7 @@ function Crud() {
                   Edit
                 </button>
                 <button
-                  onClick={() => handleDelete(idx)}
+                  onClick={() => handleDelete(item.id)}
                   style={{
                     marginLeft: 6,
                     fontSize: "1rem",
